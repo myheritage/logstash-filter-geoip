@@ -4,6 +4,8 @@ require "logstash/namespace"
 
 require "logstash-filter-geoip_jars"
 
+require "json"
+
 java_import "java.net.InetAddress"
 java_import "com.maxmind.geoip2.DatabaseReader"
 java_import "com.maxmind.geoip2.model.AnonymousIpResponse"
@@ -158,7 +160,7 @@ class LogStash::Filters::GeoIP < LogStash::Filters::Base
 
     begin
 #      ip = event.respond_to? :get ? event.get(@source) : event[@source]
-      ip = event[@source]
+      ip = event.get(@source)
       ip = ip.first if ip.is_a? Array
       geo_data_hash = Hash.new
       ip_address = InetAddress.getByName(ip)
@@ -174,12 +176,14 @@ class LogStash::Filters::GeoIP < LogStash::Filters::Base
       raise e
     end
     if @merge
-      event[@target] ||= {}
-      event[@target].merge!(geo_data_hash)
+      original = event.get(@target)
+      original ||= {}
+      original.merge!(geo_data_hash)
+      event.set(@target, original)
     else
-      event[@target] = geo_data_hash
+      event.set(@target, geo_data_hash)
     end
-    logger.info "GEOTARGET: #{event[@target].inspect}"
+    logger.info "GEOTARGET: #{event.get(@target).inspect}"
 
     if geo_data_hash.empty?
       tag_unsuccessful_lookup(event)
